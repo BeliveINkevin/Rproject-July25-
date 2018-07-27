@@ -1,0 +1,126 @@
+---
+title: "Analyzing poverty according to region and attempting to predict GNP"
+author: "Kevin"
+date: "July 26, 2018"
+output:
+  html_document: default
+  word_document: default
+---
+
+
+
+I was always fascinated about learning about poverty in our society. There are many countries, especially those in the African and Middle Eastern regions, that go through many issues. Typically these countries have very high birth & death rates as well as a low GNP. Basically, the lower the GNP, the worst the country is in terms of functioning properly to survive. These proverty stricken countries have a hard time keeping up with demands in food and healthcare as the population blows up exponentially. So for this project, I will analyze trends in poverty *according* to region. The dataset was obtained from https://www2.stetson.edu/~jrasp/data.htm which includes data for 97 countries
+
+##Defining some terms.
+###This dataset includes terms which includes:
+1. Birthrate=The number of live births per thousand of population per year
+2. Deathrate=The ratio of deaths to the population of a particular area during a particular period of time, usually calculated as the number of deaths per thousand of people per year
+3. Infant Mortality Rate=Death of children who are less than 1 year old
+4-5. Life expectancy rate= The average period that someone is expected to live for male and female
+6. GNP= The total value of goods produced & serives provided by a country during 1 year. It's equal to GDP $+$ Net income from foreigh investiments
+
+####The regions in this dataset include
+  1. Russian region
+  2. South America
+  3. Europe, America, and Japan(Not communist)
+  4. Middle East
+  5. Asian region
+  6. African region
+
+##Working with the Data
+So for this, I downloaded the dataset(link above) and imported it into R
+```{r}
+library(readr)
+df<-read_csv("C:/Documents/My Excel/Poverty.csv")
+head(df)
+library(ggplot2)
+```
+
+##Cleaning the data
+Now notice that the 4th row in the head of the raw dataframe has an asterisk for GNP. This is to indicate that the value for GNP for that particular country is missing. Unfortunately, It is impossible for me to determine the GNP for the countries with the missing values because I don't know what year this data was from. Also, replacing the missing value with the mean and median imputation would result in an ambiguous GNP value. Therefore, the best way for me to clean the data is to delete the rows with the missing value
+```{r}
+poverty<-df[-c(4,8,50,56,61,70),]# Note the reason why you're deleting these rows
+#poverty<-sapply(df1[1:91,1:7], as.numeric)
+poverty$GNP<-as.numeric(poverty$GNP)
+head(poverty)
+```
+Now it looks like that the country with the missing value has beeen deleted
+
+##Identifying a relationship between birth and death rates using regression
+```{r}
+birthdeath=lm(poverty$BirthRt~poverty$DeathRt)
+summary(birthdeath)
+```
+
+```{r}
+deathbirth=lm(poverty$DeathRt~poverty$BirthRt)
+summary(deathbirth)
+summary(poverty$BirthRt)
+```
+Looking at the regression I calculated, the *R^2* value is *0.2473*. This suggest that the relationship between birth and death rates have close to an inverse relationship. Typically when Birth rate increases, Death rate tends to decrease as well. 
+
+```{r}
+plot(birthdeath)
+```
+
+```{r}
+plot(deathbirth)
+```
+
+```{r}
+plot(poverty$BirthRt,poverty$DeathRt)
+```
+Looking at the death vs birth rate graph above. It appears that this graph looks very similar to a graph with the model $y=x^2$ graph. The graph starts off as having a median of 15 people dead per 10 people born. The death rate sligtly decreases as the birth rate increases, favoring the mean of birth rate, then ss birth rate increases more, we see more people dying. It appears that there is kindof a linear trend for birth and death rates; however, it starts off at the median for death rate. 
+
+```{r}
+summary(poverty$InfMort) #Min goes to Japan while max goes to Alganistan
+```
+
+##Countries where infant mortality is greater than 90. 
+###This is a serious issue and these countries are in danger
+```{r}
+infMortabove90=subset(poverty,InfMort > 90)
+unique(infMortabove90$Country)
+```
+
+##Does death rate impact infant mortality as well as life expectancy
+```{r}
+Deathmort=lm(poverty$DeathRt~poverty$InfMort)
+summary(Deathmort) #Remember that this only has correlation in certain countries. Not all
+```
+Honestly, looking at the regression for all countries, not much; however, in certain countries, there is a stronger relationship between infant mortality and death rate.
+
+##Is there a relationship between GNP and life expectancy for males and females?
+```{r}
+GNPMF=lm(poverty$GNP~poverty$LExpM+poverty$LExpF)
+summary(GNPMF)
+```
+Since the *r^2* value is around 41%, there is not much correlation between life expectancy with regards to GNP. Usually for most countries, the life expectancy is high enough to offset the GNP. In my opinion, life expectancy plays no role in determining GNP since it is high in most countries. There are also certain countries, such as Egypt, where the life expectancy is in the mid 60s but the GNP is 600 which is very low
+
+##Plotting the regression of GNP to deathrate
+looking at the plot, it appears that there seems to be a trend for GNP and Death rate. Typically, a higher GNP impies that the country is more Economically stable and supportive, therefore having a lower death rate. When looking at this graph, it appears that the death rate is around 5-10 for countries with high GNP. There are some countries that fall into the median GNP but have very low death rates
+```{r}
+a<-ggplot(poverty,aes(GNP,DeathRt))
+a+geom_jitter()+geom_smooth(method="lm")
+```
+
+##My next goal is to predict the GNP for the rows I previously cleaned
+```{r}
+GNPpredictor<-lm(poverty$GNP~poverty$BirthRt+poverty$DeathRt+poverty$InfMort+poverty$LExpM+poverty$LExpF)
+summary(GNPpredictor)
+```
+Unfortunately, I wasn't able to accurately predict the GNP for the countries with the missing GNP. I believe that the regression model is not accurate enough since the *r^2* is below 45%. I tried predicting the GNP for former east germany and got a GNP prediction of13358. That value is too high and is not suitable. I think the reason for my model failing is because I included Life expenctancy in my regression equation and I think that it was unnecessary and adds redundancy to the model which results in inaccurate predictions.
+
+##Plotting Birth rate vs death rate by region
+It appears that region 6, which is the african region, has the highest birth rates and the highest death rates
+```{r}
+a<-ggplot(poverty,aes(x=BirthRt,y=DeathRt,color=factor(Region)))
+a+geom_jitter()
+```
+
+##Which region had the greatest GNP
+
+```{r}
+a<-ggplot(poverty,aes(x=Region,y=GNP,color=factor(Region)))
+a+geom_jitter()
+```
